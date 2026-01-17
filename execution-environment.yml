@@ -73,4 +73,4 @@ additional_build_steps:
     - ENV HELM_PLUGINS=/usr/local/share/helm/plugins
     - RUN mkdir -p $HELM_PLUGINS
     - RUN helm plugin install https://github.com/databus23/helm-diff
-
+    - RUN ln -sf /usr/bin/python3.11 /usr/bin/python3
