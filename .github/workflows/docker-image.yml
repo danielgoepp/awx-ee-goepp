@@ -1,0 +1,61 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  IMAGE: ghcr.io/danielgoepp/awx-ee-goepp
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Compute short SHA
+      id: vars
+      run: echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install ansible-builder
+      run: pip install ansible-builder==3.1.0
+
+    - name: Generate build context
+      run: ansible-builder create -v3 --output-filename Dockerfile
+
+    - name: Log in to GHCR
+      if: github.event_name == 'push'
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build the Docker image
+      run: |
+        docker build context --file context/Dockerfile \
+          --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+          --label "org.opencontainers.image.revision=${{ github.sha }}" \
+          --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          --tag "$IMAGE:latest" \
+          --tag "$IMAGE:${{ steps.vars.outputs.sha }}"
+
+    - name: Push to GHCR
+      if: github.event_name == 'push'
+      run: |
+        docker push "$IMAGE:${{ steps.vars.outputs.sha }}"
+        docker push "$IMAGE:latest"
